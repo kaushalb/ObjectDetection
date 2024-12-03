@@ -3,6 +3,7 @@ import cvlib as cv
 from cvlib.object_detection import draw_bbox
 from gtts import gTTS
 from playsound import playsound
+import os
 
 
 def speech(text):
@@ -25,40 +26,38 @@ if not camera.isOpened():
 
 items = []
 
-# while camera.isOpened():
-#     ret, frame = camera.read()
-#     face, confidence = cv.detect_face(frame)
-#
-#     # loop through detected faces
-#     for idx, f in enumerate(face):
-#         (startX, startY) = f[0], f[1]
-#         (endX, endY) = f[2], f[3]
-#
-#         # draw rectangle over face
-#         cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-#
-#         text = "{:.2f}%".format(confidence[idx] * 100)
-#
-#         Y = startY - 10 if startY - 10 > 10 else startY + 10
-#
-#         # write confidence percentage on top of face rectangle
-#         cv2.putText(frame, text, (startX, Y), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-#                     (0, 255, 0), 2)
-#
-#     # display output
-#     cv2.imshow("Real-time face detection", frame)
-#
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
+output_dir = "./captured_frames"
+os.makedirs(output_dir, exist_ok=True)
+
+person_detected = False
+frames_captured = 0
+frames_to_capture = 20
+image_set = []
+person_counter = 0
 
 while True:
     ret, frame = camera.read()
     bbox, label, conf = cv.detect_common_objects(frame)
     output_image = draw_bbox(frame, bbox, label, conf)
-    faces, confidences = cv.detect_face(output_image)
-    if faces:
-        print("your face", faces)
     cv2.imshow("Object Detection", output_image)
+
+    if "person" in label:
+        person_counter += 1
+
+    if "person" in label:
+        if not person_detected:
+            person_detected = True
+            frames_captured = 0  # Reset frame counter
+
+        # Capture frames if the "person" label is detected
+        if frames_captured < frames_to_capture:
+            image_set.append(frame)
+            frame_filename = os.path.join(output_dir, f"person_{person_counter}_frame_{frames_captured + 1}.jpg")
+            cv2.imwrite(frame_filename, frame)
+            frames_captured += 1
+        break
+    else:
+        person_detected = False
 
     for item in label:
         if item in items:
@@ -68,6 +67,13 @@ while True:
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
+
+print(image_set)
+if len(image_set) >= 20:
+    training_set = image_set[:10]
+    target_set = image_set[10:20]
+
+
 i = 0
 audioQueue = []
 for label in items:
@@ -80,3 +86,6 @@ for label in items:
 speech_text = " ".join(audioQueue)
 print(speech_text)
 speech(speech_text)
+
+camera.release()
+cv2.destroyAllWindows()
